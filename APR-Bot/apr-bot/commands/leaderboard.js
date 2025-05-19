@@ -3,14 +3,18 @@ import { getLeaderboard } from '../utils/xpManager.js';
 
 export const data = new SlashCommandBuilder()
   .setName('leaderboard')
-  .setDescription('Show top XP earners');
+  .setDescription('Show the top 10 users by level in this server');
 
 export async function execute(interaction) {
-  const leaderboard = getLeaderboard();
+  const leaderboard = getLeaderboard(interaction.guild.id);
+  if (leaderboard.length === 0) {
+    await interaction.reply('No data yet!');
+    return;
+  }
 
-  const top = leaderboard
-    .map((user, index) => `${index + 1}. <@${user.userId}> — Level ${user.level}`)
-    .join('\n');
+  const lines = leaderboard.map((u, i) =>
+    `${i + 1}. <@${u.userId}> — Level ${u.level}`
+  );
 
-  await interaction.reply(`🏆 **Server Leaderboard** 🏆\n${top}`);
+  await interaction.reply(`🏆 Server Leaderboard 🏆\n${lines.join('\n')}`);
 }
