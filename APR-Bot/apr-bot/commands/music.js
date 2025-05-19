@@ -1,3 +1,4 @@
+// commands/music.js
 import { SlashCommandBuilder } from 'discord.js';
 import musicPlayer from '../utils/musicPlayer.js';
 
