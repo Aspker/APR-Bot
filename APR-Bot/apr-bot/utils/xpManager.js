@@ -13,13 +13,24 @@ let globalXpData = JSON.parse(fs.existsSync(globalXpFilePath)
   : '{}');
 
 const cooldowns = new Map(); 
-
 function saveXpData() {
-  fs.writeFileSync(xpFilePath, JSON.stringify(xpData, null, 2));
+  try {
+    const tempFile = xpFilePath + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(xpData, null, 2));
+    fs.renameSync(tempFile, xpFilePath);
+  } catch (error) {
+    console.error('Error saving XP data:', error);
+  }
 }
 
 function saveGlobalXpData() {
-  fs.writeFileSync(globalXpFilePath, JSON.stringify(globalXpData, null, 2));
+  try {
+    const tempFile = globalXpFilePath + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(globalXpData, null, 2));
+    fs.renameSync(tempFile, globalXpFilePath);
+  } catch (error) {
+    console.error('Error saving global XP data:', error);
+  }
 }
 
 function getRequiredXp(level) {
@@ -30,11 +41,10 @@ function getRequiredXp(level) {
 function addXp(userId, guildId, amount) {
   const now = Date.now();
   const lastTime = cooldowns.get(userId) || 0;
-  if (now - lastTime < 30_000) return false; // 30s global cooldown
-
+  if (now - lastTime < 20_000) return false; 
+  
   cooldowns.set(userId, now);
 
-  // Per-server XP
   if (!xpData[guildId]) xpData[guildId] = {};
   if (!xpData[guildId][userId]) xpData[guildId][userId] = { xp: 0, level: 0 };
 
@@ -46,7 +56,6 @@ function addXp(userId, guildId, amount) {
     userData.level++;
   }
 
-  // Global XP
   if (!globalXpData[userId]) globalXpData[userId] = { xp: 0 };
   globalXpData[userId].xp += amount;
 
