@@ -1,8 +1,7 @@
-// events/ready.js
 export default {
   name: 'ready',
   once: true,
   execute(client) {
-    console.log(`✅ ${client.user.tag} is online.`);
-  }
+    console.log(`✅ Logged in as ${client.user.tag}`);
+  },
 };
