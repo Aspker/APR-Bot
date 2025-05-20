@@ -1,4 +1,3 @@
-// commands/leveling/leaderboard.js
 import { SlashCommandBuilder } from 'discord.js';
 import { getTopUsers } from '../../utils/xpManager.js';
 
@@ -16,7 +15,7 @@ export default {
     }
 
     const leaderboard = topUsers.map((user, index) =>
-      `${index + 1}. <@${user.userId}> — Level ${user.level}`
+      `${index + 1}. <@${user.userId}> — Level ${user.level} (${user.xp} XP)`
     ).join('\n');
 
     await interaction.reply(`🏆 Server Leaderboard 🏆\n${leaderboard}`);
