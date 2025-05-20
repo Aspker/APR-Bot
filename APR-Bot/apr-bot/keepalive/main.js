@@ -1,4 +1,3 @@
-// keepalive/main.js
 import '../keepalive/keepalive.js';
 import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
 import fs from 'node:fs';
@@ -14,7 +13,6 @@ const client = new Client({
 });
 client.commands = new Collection();
 
-// ✅ RECURSIVELY LOAD COMMANDS (supporting subfolders like leveling/ and media-music/)
 const foldersPath = path.join(__dirname, '../commands');
 
 async function loadCommands(dir) {
@@ -23,7 +21,7 @@ async function loadCommands(dir) {
   for (const file of files) {
     const fullPath = path.join(dir, file.name);
     if (file.isDirectory()) {
-      await loadCommands(fullPath); // Recurse into subfolder
+      await loadCommands(fullPath); 
     } else if (file.name.endsWith('.js')) {
       const command = await import(fullPath);
       if (command.default?.data && command.default?.execute) {
@@ -35,8 +33,6 @@ async function loadCommands(dir) {
 
 await loadCommands(foldersPath);
 
-
-// Register commands with Discord
 const commands = Array.from(client.commands.values()).map(command => command.data.toJSON());
 const rest = new REST().setToken(process.env.TOKEN);
 
@@ -51,7 +47,6 @@ try {
   console.error(error);
 }
 
-// ✅ LOAD EVENTS
 const eventsPath = path.join(__dirname, '../events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 for (const file of eventFiles) {
