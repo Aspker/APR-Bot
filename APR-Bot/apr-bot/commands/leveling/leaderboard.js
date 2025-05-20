@@ -4,7 +4,7 @@ import { getTopUsers } from '../../utils/xpManager.js';
 export default {
   data: new SlashCommandBuilder()
     .setName('leaderboard')
-    .setDescription('Show the server leaderboard'),
+    .setDescription('Show the server leadconst topUsers = getTopGlobalUsers(10); // <- This limits to top 10erboard'),
   async execute(interaction) {
     const guildId = interaction.guild.id;
     const topUsers = getTopUsers(guildId, 10);
