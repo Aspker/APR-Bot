@@ -1,4 +1,3 @@
-// commands/leveling/level.js
 import { SlashCommandBuilder } from 'discord.js';
 import { getUserData, getRequiredXp } from '../../utils/xpManager.js';
 
