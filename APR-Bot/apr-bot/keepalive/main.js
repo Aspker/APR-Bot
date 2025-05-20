@@ -56,4 +56,19 @@ for (const file of eventFiles) {
   else client.on(evt.name, (...args) => evt.execute(...args));
 }
 
-client.login(process.env.TOKEN);
+client.on('warn', info => console.log('Warning:', info));
+client.on('error', error => console.error('Client error:', error));
+
+process.on('unhandledRejection', error => {
+  console.error('Unhandled promise rejection:', error);
+});
+
+client.on('disconnect', () => {
+  console.log('Bot disconnected! Attempting to reconnect...');
+  setTimeout(() => client.login(process.env.TOKEN), 5000);
+});
+
+client.login(process.env.TOKEN).catch(error => {
+  console.error('Failed to login:', error);
+  process.exit(1);
+});
