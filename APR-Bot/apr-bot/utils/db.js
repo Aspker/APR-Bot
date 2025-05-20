@@ -21,7 +21,6 @@ function loadDatabase() {
 
 function saveDatabase() {
   try {
-    // Create backup before saving
     if (fs.existsSync(dbFile)) {
       fs.copyFileSync(dbFile, backupFile);
     }
