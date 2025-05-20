@@ -127,18 +127,10 @@ function showQueue(interaction) {
   return interaction.reply(`📜 **Current Queue:**\n${songList}`);
 }
 
-// Export everything needed
 export {
   handlePlayCommand,
   skipSong,
   stopPlayback,
   showQueue,
   getQueue,
-};
-
-      .map((song, index) => `${index === 0 ? '▶️' : `${index + 1}.`} ${song.title}`)
-      .join('\n');
-
-    await interaction.reply(`🎵 Current Queue:\n${list}`);
-  }
 };
