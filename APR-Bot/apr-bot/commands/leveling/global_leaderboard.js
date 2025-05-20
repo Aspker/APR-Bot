@@ -1,4 +1,3 @@
-// commands/leveling/global_leaderboard.js
 import { SlashCommandBuilder } from 'discord.js';
 import { getTopGlobalUsers } from '../../utils/xpManager.js';
 
