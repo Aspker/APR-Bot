@@ -1,20 +1,24 @@
-// commands/leveling/level.js
+// commands/leveling/leaderboard.js
 import { SlashCommandBuilder } from 'discord.js';
-import { getUserData, getRequiredXp } from '../../utils/xpManager.js';
+import { getTopUsers } from '../../utils/xpManager.js';
 
 export default {
   data: new SlashCommandBuilder()
-    .setName('level')
-    .setDescription('Check your level and XP'),
-
+    .setName('leaderboard')
+    .setDescription('Show the server leaderboard'),
   async execute(interaction) {
-    const userId = interaction.user.id;
     const guildId = interaction.guild.id;
-    const userData = getUserData(userId, guildId);
-    const requiredXp = getRequiredXp(userData.level);
+    const topUsers = getTopUsers(guildId, 10);
 
-    await interaction.reply(
-      `You are level ${userData.level} with ${userData.xp}/${requiredXp} XP.`
-    );
+    if (topUsers.length === 0) {
+      await interaction.reply('📉 No XP data yet for this server.');
+      return;
+    }
+
+    const leaderboard = topUsers.map((user, index) =>
+      `${index + 1}. <@${user.userId}> — Level ${user.level}`
+    ).join('\n');
+
+    await interaction.reply(`🏆 Server Leaderboard 🏆\n${leaderboard}`);
   },
 };
