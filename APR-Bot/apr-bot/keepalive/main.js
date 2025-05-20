@@ -1,58 +1,47 @@
-import 'dotenv/config';
-import express from 'express';
-import { Client, GatewayIntentBits, Collection } from 'discord.js';
-import { token } from '../config/config.js';
+import '../keepalive/keepalive.js';
+import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'url';
+import { config } from 'dotenv';
 
+config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const app = express();
-
-app.get('/', (req, res) => {
-  res.send('Bot is alive!');
-});
-
-app.listen(3000, () => {
-  console.log('Keepalive server running on port 3000');
-});
-
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.MessageContent,
-  ],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
-
 client.commands = new Collection();
 
-// Load commands
-const commandsPath = path.join(__dirname, '../commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+// ✅ RECURSIVELY LOAD COMMANDS (supporting subfolders like leveling/ and media-music/)
+const foldersPath = path.join(__dirname, '../commands');
 
-for (const file of commandFiles) {
-  const filePath = path.join(commandsPath, file);
-  const command = await import(filePath);
-  // Register the command with its name from named export `data`
-  client.commands.set(command.data.name, command);
-}
+async function loadCommands(dir) {
+  const files = fs.readdirSync(dir, { withFileTypes: true });
 
-// Load events
-const eventsPath = path.join(__dirname, '../events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
-
-for (const file of eventFiles) {
-  const filePath = path.join(eventsPath, file);
-  const event = await import(filePath);
-  const eventData = event.default;
-  if (eventData.once) {
-    client.once(eventData.name, (...args) => eventData.execute(...args, client));
-  } else {
-    client.on(eventData.name, (...args) => eventData.execute(...args, client));
+  for (const file of files) {
+    const fullPath = path.join(dir, file.name);
+    if (file.isDirectory()) {
+      await loadCommands(fullPath); // Recurse into subfolder
+    } else if (file.name.endsWith('.js')) {
+      const command = await import(fullPath);
+      if (command.default?.data && command.default?.execute) {
+        client.commands.set(command.default.data.name, command.default);
+      }
+    }
   }
 }
 
-client.login(token);
+await loadCommands(foldersPath);
+
+// ✅ LOAD EVENTS
+const eventsPath = path.join(__dirname, '../events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+for (const file of eventFiles) {
+  const event = await import(`../events/${file}`);
+  const evt = event.default;
+  if (evt.once) client.once(evt.name, (...args) => evt.execute(...args));
+  else client.on(evt.name, (...args) => evt.execute(...args));
+}
+
+client.login(process.env.TOKEN);
