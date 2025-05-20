@@ -14,7 +14,7 @@ export default {
     const requiredXp = getRequiredXp(userData.level);
 
     await interaction.reply(
-      `🌟 You are level ${userData.level} with ${userdata.xp}/${requiredXp} XP.``
+      `🌟 You are level ${userData.level} with ${userData.xp}/${requiredXp} XP.`
     );
   },
 };
