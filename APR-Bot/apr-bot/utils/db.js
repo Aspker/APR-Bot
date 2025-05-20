@@ -32,7 +32,7 @@ function loadDatabase() {
     }
   } catch (error) {
     console.error('Error loading database:', error);
-    // Try to restore from latest backup
+    
     const backups = fs.readdirSync(backupDir).sort().reverse();
     if (backups.length > 0) {
       console.log('Attempting to restore from latest backup...');
@@ -43,10 +43,16 @@ function loadDatabase() {
 
 function saveDatabase() {
   try {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid data format');
+    }
     createBackup();
-    fs.writeFileSync(dbFile, JSON.stringify(data, null, 2));
+    const tempFile = `${dbFile}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2));
+    fs.renameSync(tempFile, dbFile);
   } catch (error) {
     console.error('Error saving database:', error);
+    throw error;
   }
 }
 
