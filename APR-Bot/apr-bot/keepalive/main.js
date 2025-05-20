@@ -1,5 +1,6 @@
+// keepalive/main.js
 import '../keepalive/keepalive.js';
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'url';
@@ -33,6 +34,22 @@ async function loadCommands(dir) {
 }
 
 await loadCommands(foldersPath);
+
+
+// Register commands with Discord
+const commands = Array.from(client.commands.values()).map(command => command.data.toJSON());
+const rest = new REST().setToken(process.env.TOKEN);
+
+try {
+  console.log('Started refreshing application (/) commands.');
+  await rest.put(
+    Routes.applicationCommands(process.env.CLIENT_ID),
+    { body: commands },
+  );
+  console.log('Successfully reloaded application (/) commands.');
+} catch (error) {
+  console.error(error);
+}
 
 // ✅ LOAD EVENTS
 const eventsPath = path.join(__dirname, '../events');
