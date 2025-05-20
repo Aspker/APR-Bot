@@ -2,121 +2,140 @@ import {
   joinVoiceChannel,
   createAudioPlayer,
   createAudioResource,
-  entersState,
   AudioPlayerStatus,
-  VoiceConnectionStatus,
+  NoSubscriberBehavior,
 } from '@discordjs/voice';
-import ytdl from 'ytdl-core';
-import ytSearch from 'yt-search';
+import play from 'play-dl';
 
-const queues = new Map();
+const queue = new Map();
 
-function getQueue(guildId) {
-  if (!queues.has(guildId)) {
-    queues.set(guildId, {
-      songs: [],
-      connection: null,
-      player: createAudioPlayer(),
-    });
-  }
-  return queues.get(guildId);
-}
+async function playSong(guildId) {
+  const serverQueue = queue.get(guildId);
+  if (!serverQueue) return;
 
-async function playNext(guildId) {
-  const queue = getQueue(guildId);
-  const song = queue.songs[0];
+  const song = serverQueue.songs[0];
   if (!song) {
-    queue.connection?.destroy();
-    queues.delete(guildId);
+    serverQueue.voiceConnection.destroy();
+    queue.delete(guildId);
     return;
   }
 
-  const stream = ytdl(song.url, { filter: 'audioonly', highWaterMark: 1 << 25 });
-  const resource = createAudioResource(stream);
+  try {
+    const stream = await play.stream(song.url);
+    const resource = createAudioResource(stream.stream, {
+      inputType: stream.type,
+    });
 
-  queue.player.play(resource);
-  queue.connection.subscribe(queue.player);
+    serverQueue.audioPlayer.play(resource);
 
-  queue.player.once(AudioPlayerStatus.Idle, () => {
-    queue.songs.shift();
-    playNext(guildId);
-  });
+    serverQueue.audioPlayer.once(AudioPlayerStatus.Idle, () => {
+      serverQueue.songs.shift();
+      playSong(guildId);
+    });
+  } catch (error) {
+    console.error('Error playing song:', error);
+    serverQueue.songs.shift();
+    playSong(guildId);
+  }
 }
 
-export default {
-  async play(interaction, query) {
-    const member = interaction.member;
-    const voiceChannel = member.voice.channel;
+async function handlePlayCommand(interaction, song) {
+  const guildId = interaction.guild.id;
+  let serverQueue = queue.get(guildId);
+
+  if (!serverQueue) {
+    const voiceChannel = interaction.member.voice.channel;
     if (!voiceChannel) {
-      return interaction.reply({ content: '❌ You must be in a voice channel!', ephemeral: true });
+      await interaction.reply('You need to be in a voice channel to play music!');
+      return;
     }
 
-    const searchResult = await ytSearch(query);
-    const video = searchResult.videos.length ? searchResult.videos[0] : null;
+    const voiceConnection = joinVoiceChannel({
+      channelId: voiceChannel.id,
+      guildId,
+      adapterCreator: interaction.guild.voiceAdapterCreator,
+    });
 
-    if (!video) {
-      return interaction.reply({ content: '❌ No results found.', ephemeral: true });
-    }
+    const audioPlayer = createAudioPlayer({
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Pause,
+      },
+    });
 
-    const song = {
-      title: video.title,
-      url: video.url,
+    voiceConnection.subscribe(audioPlayer);
+
+    serverQueue = {
+      voiceConnection,
+      audioPlayer,
+      songs: [],
     };
+    queue.set(guildId, serverQueue);
+  }
 
-    const queue = getQueue(interaction.guildId);
-    queue.songs.push(song);
+  serverQueue.songs.push(song);
 
-    if (!queue.connection) {
-      const connection = joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: voiceChannel.guild.id,
-        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-      });
+  if (serverQueue.audioPlayer.state.status !== AudioPlayerStatus.Playing) {
+    playSong(guildId);
+  }
 
-      queue.connection = connection;
-      connection.subscribe(queue.player);
+  await interaction.reply(`🎶 Added **${song.title}** to the queue!`);
+}
 
-      try {
-        await entersState(connection, VoiceConnectionStatus.Ready, 30_000);
-        await interaction.reply(`🎶 Now playing: **${song.title}**`);
-        playNext(interaction.guildId);
-      } catch (error) {
-        console.error(error);
-        queues.delete(interaction.guildId);
-        return interaction.reply({ content: '❌ Failed to connect to voice channel.', ephemeral: true });
-      }
-    } else {
-      await interaction.reply(`🎵 Added to queue: **${song.title}**`);
-    }
-  },
+async function skipSong(interaction) {
+  const guildId = interaction.guild.id;
+  const serverQueue = queue.get(guildId);
+  if (!serverQueue) {
+    await interaction.reply('There is no song playing right now!');
+    return;
+  }
 
-  async stop(interaction) {
-    const queue = queues.get(interaction.guildId);
-    if (!queue) return interaction.reply('❌ No music is playing.');
+  serverQueue.audioPlayer.stop();
+  await interaction.reply('⏭️ Skipped the current song!');
+}
 
-    queue.player.stop();
-    queue.connection.destroy();
-    queues.delete(interaction.guildId);
-    await interaction.reply('🛑 Music stopped and queue cleared.');
-  },
+async function stopPlayback(interaction) {
+  const guildId = interaction.guild.id;
+  const serverQueue = queue.get(guildId);
+  if (!serverQueue) {
+    await interaction.reply('There is no music playing to stop!');
+    return;
+  }
 
-  async skip(interaction) {
-    const queue = queues.get(interaction.guildId);
-    if (!queue || queue.songs.length < 2) {
-      return interaction.reply('❌ No song to skip to.');
-    }
+  serverQueue.songs = [];
+  serverQueue.audioPlayer.stop();
+  serverQueue.voiceConnection.destroy();
+  queue.delete(guildId);
 
-    queue.player.stop(); // Automatically triggers next song
-    await interaction.reply('⏭️ Skipped to the next song.');
-  },
+  await interaction.reply('🛑 Stopped playback and cleared the queue.');
+}
 
-  async showQueue(interaction) {
-    const queue = queues.get(interaction.guildId);
-    if (!queue || queue.songs.length === 0) {
-      return interaction.reply('📭 The queue is empty.');
-    }
+function getQueue(guildId) {
+  return queue.get(guildId);
+}
 
-    const list = queue.songs
+function showQueue(interaction) {
+  const serverQueue = queue.get(interaction.guild.id);
+
+  if (!serverQueue || serverQueue.songs.length === 0) {
+    return interaction.reply('❌ The queue is currently empty.');
+  }
+
+  const songList = serverQueue.songs
+    .map((song, index) => `${index + 1}. **${song.title}**`)
+    .join('\n');
+
+  return interaction.reply(`📜 **Current Queue:**\n${songList}`);
+}
+
+// Export everything needed
+export {
+  handlePlayCommand,
+  skipSong,
+  stopPlayback,
+  showQueue,
+  getQueue,
+};
+
       .map((song, index) => `${index === 0 ? '▶️' : `${index + 1}.`} ${song.title}`)
       .join('\n');
 
