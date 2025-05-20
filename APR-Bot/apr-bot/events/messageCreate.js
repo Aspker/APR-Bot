@@ -1,10 +1,18 @@
-// events/messageCreate.js
-import { addXP } from '../utils/xpManager.js';
+import { addXp } from '../utils/xpManager.js';
+
+const cooldowns = new Map();
 
 export default {
   name: 'messageCreate',
   async execute(message) {
-    if (!message.guild || message.author.bot) return;
-    addXP(message.guild.id, message.author.id); // Pass guild ID and user ID
-  }
+    if (message.author.bot || !message.guild) return;
+
+    const key = `${message.guild.id}-${message.author.id}`;
+    const now = Date.now();
+
+    if (cooldowns.has(key) && now - cooldowns.get(key) < 30000) return;
+    cooldowns.set(key, now);
+
+    addXp(message.author.id, message.guild.id, 10);
+  },
 };
