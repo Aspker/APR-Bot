@@ -13,6 +13,7 @@ let globalXpData = JSON.parse(fs.existsSync(globalXpFilePath)
   : '{}');
 
 const cooldowns = new Map(); 
+
 function saveXpData() {
   try {
     const tempFile = xpFilePath + '.tmp';
@@ -39,56 +40,33 @@ function getRequiredXp(level) {
 }
 
 function addXp(userId, guildId, amount) {
-  const now = Date.now();
-  const lastTime = cooldowns.get(userId) || 0;
-  if (now - lastTime < 20_000) return false; 
-  
-  cooldowns.set(userId, now);
+  try {
+    if (!userId || !guildId || amount < 0) return false;
 
-  if (!xpData[guildId]) xpData[guildId] = {};
-  if (!xpData[guildId][userId]) xpData[guildId][userId] = { xp: 0, level: 0 };
+    const now = Date.now();
+    const lastTime = cooldowns.get(userId) || 0;
+    if (now - lastTime < 20_000) return false; 
+    cooldowns.set(userId, now);
 
-  const userData = xpData[guildId][userId];
-  userData.xp += amount;
+    if (!xpData[guildId]) xpData[guildId] = {};
+    if (!xpData[guildId][userId]) xpData[guildId][userId] = { xp: 0, level: 0 };
 
-  while (userData.xp >= getRequiredXp(userData.level)) {
-    userData.xp -= getRequiredXp(userData.level);
-    userData.level++;
+    const userData = xpData[guildId][userId];
+    userData.xp += amount;
+
+    while (userData.xp >= getRequiredXp(userData.level)) {
+      userData.xp -= getRequiredXp(userData.level);
+      userData.level++;
+    }
+
+    if (!globalXpData[userId]) globalXpData[userId] = { xp: 0 };
+    globalXpData[userId].xp += amount;
+
+    saveXpData();
+    saveGlobalXpData();
+    return true;
+  } catch (error) {
+    console.error('Error adding XP:', error);
+    return false;
   }
-
-  if (!globalXpData[userId]) globalXpData[userId] = { xp: 0 };
-  globalXpData[userId].xp += amount;
-
-  saveXpData();
-  saveGlobalXpData();
-  return true;
 }
-
-function getUserData(userId, guildId) {
-  if (!xpData[guildId]) xpData[guildId] = {};
-  if (!xpData[guildId][userId]) xpData[guildId][userId] = { xp: 0, level: 0 };
-  return xpData[guildId][userId];
-}
-
-function getTopUsers(guildId, limit = 10) {
-  if (!xpData[guildId]) return [];
-  return Object.entries(xpData[guildId])
-    .map(([userId, data]) => ({ userId, ...data }))
-    .sort((a, b) => b.level - a.level || b.xp - a.xp)
-    .slice(0, limit);
-}
-
-function getTopGlobalUsers(limit = 10) {
-  return Object.entries(globalXpData)
-    .map(([userId, data]) => ({ userId, ...data }))
-    .sort((a, b) => b.xp - a.xp)
-    .slice(0, limit);
-}
-
-export {
-  addXp,
-  getUserData,
-  getTopUsers,
-  getTopGlobalUsers,
-  getRequiredXp,
-};
