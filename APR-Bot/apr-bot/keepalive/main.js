@@ -1,5 +1,5 @@
 import '../keepalive/keepalive.js';
-import { Client, Collection, GatewayIntentBits, REST, Routes } from 'discord.js';
+import { Client, Collection, GatewayIntentBits, PermissionFlagsBits } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'url';
@@ -21,32 +21,24 @@ async function loadCommands(dir) {
         const command = await import(fullPath);
         if (command.default?.data && command.default?.execute) {
           if (client.commands.has(command.default.data.name)) {
-            console.warn(`Warning: Duplicate command name detected: ${command.default.data.name}`);
+            console.warn(`⚠️ Duplicate command name detected: ${command.default.data.name}`);
           }
           client.commands.set(command.default.data.name, command.default);
-          console.log(`Loaded command: ${command.default.data.name}`);
+          console.log(`✅ Loaded command: ${command.default.data.name}`);
         }
       } catch (error) {
-        console.error(`Failed to load command ${file.name}:`, error);
+        console.error(`❌ Failed to load command ${file.name}:`, error);
       }
     }
   }
 }
 const commandsPath = path.join(__dirname, '../commands');
 await loadCommands(commandsPath);
-const commandsData = Array.from(client.commands.values()).map(cmd => cmd.data.toJSON());
-console.log('Commands to register:', commandsData.map(c => c.name));
-const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 try {
-  console.log('Started refreshing application (/) commands.');
-  await rest.put(
-    Routes.applicationCommands(process.env.CLIENT_ID),
-    { body: commandsData }
-  );
-
-  console.log('Successfully reloaded global application (/) commands.');
+  const allowCommandModule = await import('../commands/misc/allow.js');
+  client.commands.set('allow', allowCommandModule.default);
 } catch (error) {
-  console.error('Error refreshing commands:', error);
+  console.error('❌ Failed to load allow command module:', error);
 }
 const eventsPath = path.join(__dirname, '../events');
 const eventFiles = fs.readdirSync(eventsPath).filter(f => f.endsWith('.js'));
@@ -57,7 +49,7 @@ for (const file of eventFiles) {
     if (evt.once) client.once(evt.name, (...args) => evt.execute(...args, client));
     else client.on(evt.name, (...args) => evt.execute(...args, client));
   } catch (error) {
-    console.error(`Failed to load event ${file}:`, error);
+    console.error(`❌ Failed to load event ${file}:`, error);
   }
 }
 client.on('warn', info => console.log('Warning:', info));
@@ -66,12 +58,6 @@ process.on('unhandledRejection', error => {
   console.error('Unhandled promise rejection:', error);
 });
 client.login(process.env.TOKEN).catch(error => {
-  console.error('Failed to login:', error);
-  process.exit(1);
-});
-
-
-client.login(process.env.TOKEN).catch(error => {
-  console.error('Failed to login:', error);
+  console.error('❌ Failed to login:', error);
   process.exit(1);
 });
